@@ -1,0 +1,183 @@
+<html>
+<style>
+*{
+	margin:0;
+	padding:0;
+}
+</style>
+<canvas id="canvas" margin="0" padding="0"></canvas>
+<script>
+//canvas
+const canvas=document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+//js
+let map=[];
+let map_size=20;
+for(let i=0; i<map_size; i++){
+	let map_p = []
+	for(let j=0; j<map_size; j++){
+		let map_r=[];
+		for(let k=0; k<map_size; k++){
+			if((k==0 || j===0 || k==map_size-1 || j==map_size-1) && i<1){
+				map_r[k]=1;
+			}else{
+				if(i+4<k && k<map_size-i-4 && i+4<j && j<map_size-i-4){
+					map_r[k]=1;
+				}else{
+					map_r[k]=0;
+				}
+			}
+		}
+		map_p[j]=map_r;
+	}
+	map[i]=map_p;
+	
+}
+console.log(map);
+function ray(P,V){
+	let V_v=(V[0]**2+V[1]**2+V[2]**2)**(1/2);
+	let Ve = [V[0]/V_v,V[1]/V_v,V[2]/V_v];
+	let R = P;
+	let end = true;
+	let fix=[0,0,0];
+	if(V[0]>0){fix[0]=1}
+	if(V[1]>0){fix[1]=1}
+	if(V[2]>0){fix[2]=1}
+	let hit_target =0;
+	let hit_dir = 0;
+	let counter = 0;
+	while(end && counter<map_size*2){
+		let diff_x=(Math.floor(R[2])+fix[2]-R[2])/Ve[2];
+		let diff_y=(Math.floor(R[1])+fix[1]-R[1])/Ve[1];
+		let diff_z=(Math.floor(R[0])+fix[0]-R[0])/Ve[0];
+		if(fix[2]==0 && (Math.floor(R[2])+fix[2]-R[2])==0){diff_x=-1/Ve[2]}
+		if(fix[1]==0 && (Math.floor(R[1])+fix[1]-R[1])==0){diff_y=-1/Ve[1]}
+		if(fix[0]==0 && (Math.floor(R[0])+fix[0]-R[0])==0){diff_z=-1/Ve[0]}
+		let diff_min=Math.min(diff_x,diff_y,diff_z);
+		let V_m=0;
+		if(diff_x==diff_min){
+			V_m = diff_x;
+			hit_dir=2+fix[2];
+		}else if(diff_y==diff_min){
+			V_m = diff_y;
+			hit_dir=1+3*fix[1];
+		}else if(!(Ve[0]==0)){
+			V_m = diff_z;
+			hit_dir=5*fix[0];
+		}else if(diff_y<diff_x){
+			V_m = diff_y;
+			hit_dir=1+3*fix[1];
+		}else{
+			V_m = diff_x;
+			hit_dir=2+fix[2];
+		}
+		R=[R[0]+Ve[0]*V_m,R[1]+Ve[1]*V_m,R[2]+Ve[2]*V_m];
+		let R_f=[Math.floor(R[0]),Math.floor(R[1]),Math.floor(R[2])];
+		if(fix[0]==0 && (Math.floor(R[0])+fix[0]-R[0])==0){R_f[0]-=1}
+		if(fix[1]==0 && (Math.floor(R[1])+fix[1]-R[1])==0){R_f[1]-=1}
+		if(fix[2]==0 && (Math.floor(R[2])+fix[2]-R[2])==0){R_f[2]-=1}
+		if(R_f[0]<0 || R_f[0]>=map.length || R_f[1]<0 || R_f[1]>=map.length || R_f[2]<0 || R_f[2]>=map.length){
+			hit_target=0;
+			end = false;
+		}else if(!(map[R_f[0]][R_f[1]][R_f[2]]==0)){
+			hit_target=map[R_f[0]][R_f[1]][R_f[2]];
+			end = false;
+		}
+		counter++;
+	}
+	if(counter>map_size*2){console.log("error:",P,V)}
+	return [hit_target,hit_dir,R];
+}
+function render(CamP,FoV,res){
+	canvas.width=window.innerWidth;
+	canvas.height=window.innerHeight;
+	canvas.requestPointerLock();
+	ctx.fillStyle="#000000";
+	ctx.fillRect(0,0,canvas.width,canvas.height);
+	let DrawX=0;
+	let DrawY=0;
+	let Zθ;
+	let Eθ;
+	for(let h=0; h<canvas.height; h+=res){
+		for(let w=0; w<canvas.width; w+=res){
+			Zθ=CamP[3]+Math.atan(2*(w-canvas.width/2)*Math.tan(FoV/2)/canvas.width);
+			let fixZθ=Math.atan(2*(w-canvas.width/2)*Math.tan(FoV/2)/canvas.width);
+			Eθ=CamP[4]+Math.atan(-2*(h-canvas.height/2)*Math.tan(FoV/2)/canvas.width);
+			let fixEθ=Math.atan(-2*(h-canvas.height/2)*Math.tan(FoV/2)/canvas.width)
+			let target = ray([CamP[0],CamP[1],CamP[2]],[Math.sin(Eθ)*Math.cos(fixZθ),Math.sin(Zθ)*Math.cos(fixEθ),Math.cos(Zθ)*Math.cos(fixEθ)]);
+			let dist = ((target[2][0]-CamP[0])**2+(target[2][1]-CamP[1])**2+(target[2][2]-CamP[2])**2)**(1/2);
+			if(target[0]==1){
+				ctx.fillStyle="#FFFFFF";
+				ctx.fillRect(w,h,res,res);
+				ctx.fillStyle="rgba("+[0,0,0,((target[1])+5*dist/(10+dist))/10]+")";
+			}else{
+				if(Eθ>0){
+					ctx.fillStyle="#6666FF";
+				}else{
+					ctx.fillStyle="#774400";
+				}
+			}
+			ctx.fillRect(w,h,res,res);
+		}
+	}
+}
+let Player=[1.5,1.5,1.5,0,0,0.1,0,0,0];
+let fov = Math.PI*2/3;
+main();
+function main(){
+	document.addEventListener("mousedown",pointerLock);
+	document.addEventListener("mousemove",cameraSpin);
+	document.addEventListener("keydown",keypress_);
+	document.addEventListener("keyup",keyup_);
+	play(0);
+}
+function pointerLock(event){
+	if(!(document.pointerLockElement === canvas)){
+		canvas.requestPonterLock=canvas.requestPointerLock || canvas.mozRequestPointerLock;
+	}
+}
+function cameraSpin(event){
+	Player[3]+=Math.atan(event.movementX*Math.tan(fov/2)/canvas.width);
+	Player[4]+=Math.atan(-event.movementY*Math.tan(fov/2)/canvas.width);
+
+}
+function keypress_(event){
+	if(event.key=="w"){
+		Player[8]=Player[5];
+	}
+	if(event.key=="a"){
+		Player[7]=-Player[5];
+	}
+	if(event.key=="s"){
+		Player[8]=-Player[5];
+	}
+	if(event.key=="d"){
+		Player[7]=Player[5];
+	}
+
+}
+function keyup_(event){
+	if(event.key=="w"){
+		Player[8]=0;
+	}
+	if(event.key=="a"){
+		Player[7]=0;
+	}
+	if(event.key=="d"){
+		Player[7]=0;
+	}
+	if(event.key=="s"){
+		Player[8]=0;
+	}
+}
+
+
+function play(){
+	render(Player,fov,4);
+	Player[2]+=Player[8]*Math.cos(Player[3])-Player[7]*Math.sin(Player[3]);
+	Player[1]+=Player[8]*Math.sin(Player[3])+Player[7]*Math.cos(Player[3]);
+	window.requestAnimationFrame(play);
+}
+</script>
+</html>
